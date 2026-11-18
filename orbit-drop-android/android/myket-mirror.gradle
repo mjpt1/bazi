@@ -1,0 +1,21 @@
+// Use Myket's Google Maven mirror (dl.google.com is blocked from Iran).
+// Run builds with: gradlew -I myket-mirror.gradle assembleDebug
+def mirror = 'https://maven.myket.ir'
+
+def swap = { RepositoryHandler repos ->
+    repos.all { r ->
+        if (r instanceof MavenArtifactRepository && r.url.toString().contains('dl.google.com')) {
+            r.url = mirror
+        }
+    }
+}
+
+settingsEvaluated { settings ->
+    swap(settings.pluginManagement.repositories)
+    swap(settings.dependencyResolutionManagement.repositories)
+}
+
+allprojects { p ->
+    swap(p.buildscript.repositories)
+    swap(p.repositories)
+}

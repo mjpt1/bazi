@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>icon</title>
+<style>html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block}</style></head>
+<body><canvas id="c"></canvas>
+<script>
+// ?mode=full | fg | bg   &size=1024
+const q=new URLSearchParams(location.search), MODE=q.get("mode")||"full", N=+(q.get("size")||1024);
+const cv=document.getElementById("c"); cv.width=cv.height=N; const g=cv.getContext("2d");
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function vnoise(seed){const p=new Float32Array(65536),r=mulberry32(seed);for(let i=0;i<65536;i++)p[i]=r();
+  const G=(a,b)=>p[((a&255)<<8)|(b&255)],s=t=>t*t*(3-2*t);
+  return(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),u=s(x-xi),v=s(y-yi),a=G(xi,yi),b=G(xi+1,yi),c=G(xi,yi+1),d=G(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}}
+const fbm=(n,x,y,o=5)=>{let s=0,a=.5,f=1;for(let i=0;i<o;i++){s+=a*n(x*f+i*17,y*f+i*31);f*=2;a*=.5}return s};
+const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
+const ramp=(st,t)=>{t=Math.max(0,Math.min(.9999,t))*(st.length-1);const i=Math.floor(t);return mix(st[i],st[i+1],t-i)};
+
+// lit sphere (light from top-left), so icon reads as a real 3D planet
+function sphere(R,fn,seed){
+  const S=Math.ceil(R*2),c=document.createElement("canvas");c.width=c.height=S;const x2=c.getContext("2d"),img=x2.createImageData(S,S),n=vnoise(seed),ex=fn.init?fn.init(mulberry32(seed+1)):null;
+  const L=[-.55,-.6,.58],ll=Math.hypot(...L);L[0]/=ll;L[1]/=ll;L[2]/=ll;
+  for(let y=0;y<S;y++)for(let x=0;x<S;x++){const nx=(x+.5-R)/R,ny=(y+.5-R)/R,d2=nx*nx+ny*ny;if(d2>1)continue;
+    const z=Math.sqrt(1-d2),lat=Math.asin(ny),lon=Math.asin(Math.max(-1,Math.min(1,nx/Math.cos(lat||1e-6))));
+    const col=fn(n,lon,lat,nx,ny,z,ex),dif=Math.max(0,nx*L[0]+ny*L[1]+z*L[2]),light=.08+1.05*Math.pow(dif,.85);
+    const rim=Math.pow(1-z,3)*.6,i=(y*S+x)*4;
+    img.data[i]=Math.min(255,col[0]*light+rim*255*.9);img.data[i+1]=Math.min(255,col[1]*light+rim*170);img.data[i+2]=Math.min(255,col[2]*light+rim*110);
+    img.data[i+3]=255*Math.max(0,Math.min(1,(1-Math.sqrt(d2))*R))}
+  x2.putImageData(img,0,0);return c}
+const GAS=[[92,48,30],[176,104,58],[232,190,140],[204,140,84],[150,84,48],[238,214,176]];
+function gas(n,lon,lat){const t=.5+.5*Math.sin(lat*7+1.6*fbm(n,lon*1.5+3,lat*5));let c=ramp(GAS,t*.6+.4*fbm(n,lon*3,lat*12,4));
+  const sx=(lon+.15)/.34,sy=(lat-.38)/.14,sd=sx*sx+sy*sy;if(sd<1){const k=1-sd;c=mix(c,[196,70,40],k*.85);c=mix(c,[240,170,120],Math.max(0,k-.7)*2)}return c}
+function moonFn(t){const f=(n,lo,la,nx,ny,z,cr)=>{let v=.55+.45*fbm(n,nx*3+5,ny*3+5);for(const k of cr){const d=Math.hypot(nx-k.x,ny-k.y)/k.r;if(d<1)v*=d<.8?.72+.2*d:1.15}return[t[0]*v,t[1]*v,t[2]*v]};
+  f.init=r=>{const a=[];for(let i=0;i<8;i++)a.push({x:r()*1.6-.8,y:r()*1.6-.8,r:.1+r()*.25});return a};return f}
+
+function background(){
+  const bg=g.createRadialGradient(N*.5,N*.45,0,N*.5,N*.5,N*.75);bg.addColorStop(0,"#1d2150");bg.addColorStop(1,"#04050d");g.fillStyle=bg;g.fillRect(0,0,N,N);
+  const r=mulberry32(5),neb=[[120,60,210],[40,120,230],[210,60,150]];
+  for(let i=0;i<5;i++){const x=r()*N,y=r()*N,rad=(.3+r()*.4)*N,col=neb[i%3],ng=g.createRadialGradient(x,y,0,x,y,rad);
+    ng.addColorStop(0,`rgba(${col},0.22)`);ng.addColorStop(1,"rgba(0,0,0,0)");g.fillStyle=ng;g.fillRect(0,0,N,N)}
+  for(let i=0;i<220;i++){const s=(r()<.9?r()*1.4+.4:r()*2.4+1.4)*N/1024;g.fillStyle=`rgba(235,240,255,${.35+r()*.65})`;g.beginPath();g.arc(r()*N,r()*N,s,0,7);g.fill()}
+}
+function foreground(scale){
+  const c=N/2, u=N/1024*scale;
+  g.save();g.translate(c,c);
+  // orbit rings
+  for(const [R,a] of [[300,.55],[400,.35]]){g.beginPath();g.arc(0,0,R*u,0,7);g.strokeStyle=`rgba(160,175,255,${a})`;g.lineWidth=7*u;g.shadowColor="#8fa0ff";g.shadowBlur=30*u;g.stroke()}
+  g.shadowBlur=0;
+  // atmosphere glow
+  const pr=200*u,at=g.createRadialGradient(0,0,pr*.85,0,0,pr*1.55);at.addColorStop(0,"rgba(255,170,100,0.6)");at.addColorStop(1,"rgba(255,120,60,0)");
+  g.fillStyle=at;g.beginPath();g.arc(0,0,pr*1.55,0,7);g.fill();
+  g.drawImage(sphere(pr,gas,7),-pr,-pr,pr*2,pr*2);
+  // comet trail + launched moon
+  const ma=-0.62, mr=58*u, mx=300*u*Math.cos(ma), my=300*u*Math.sin(ma);
+  const tr=g.createLinearGradient(pr*Math.cos(ma),pr*Math.sin(ma),mx,my);tr.addColorStop(0,"rgba(255,220,160,0)");tr.addColorStop(1,"rgba(255,235,200,0.9)");
+  g.strokeStyle=tr;g.lineWidth=mr*1.3;g.lineCap="round";g.beginPath();g.moveTo(pr*Math.cos(ma),pr*Math.sin(ma));g.lineTo(mx,my);g.stroke();
+  g.drawImage(sphere(mr,moonFn([175,215,245]),101),mx-mr,my-mr,mr*2,mr*2);
+  // second moon on outer ring
+  const m2=2.35, r2=50*u; g.drawImage(sphere(r2,moonFn([225,130,95]),102),400*u*Math.cos(m2)-r2,400*u*Math.sin(m2)-r2,r2*2,r2*2);
+  g.restore();
+}
+if(MODE==="bg") background();
+else if(MODE==="fg") foreground(0.62);         // fits Android adaptive-icon safe zone
+else { background(); foreground(1); }
+document.title="done";
+</script></body></html>

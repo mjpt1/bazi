@@ -1,0 +1,5 @@
+# Block direct access to config and local test databases
+<FilesMatch "^(config\.php|config\.sample\.php|.*\.sqlite)$">
+    Require all denied
+</FilesMatch>
+Options -Indexes

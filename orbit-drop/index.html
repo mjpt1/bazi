@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Orbit Drop</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0e1a;overflow:hidden;font-family:system-ui,sans-serif;color:#cfd6ff;touch-action:none;user-select:none}
+  canvas{display:block;width:100vw;height:100vh}
+  #msg,#best{direction:rtl}
+  #menuBtn{position:fixed;top:calc(10px + env(safe-area-inset-top));left:12px;z-index:4;width:44px;height:44px;border-radius:50%;border:1px solid #39407a;background:#141a33cc;color:#cfd6ff;font-size:22px;line-height:40px;padding:0}
+  .sheet{position:fixed;inset:0;z-index:5;display:none;align-items:center;justify-content:center;background:rgba(3,4,12,.7);direction:rtl;font-family:Tahoma,"Segoe UI",sans-serif}
+  .sheet.open{display:flex}
+  .card{background:#141a33;border:1px solid #39407a;border-radius:16px;padding:20px;width:min(320px,86vw);text-align:center;box-shadow:0 10px 40px #0008}
+  .card h3{margin:0 0 6px;color:#fff;font-size:20px}
+  .card p{margin:0 0 14px;font-size:14px;line-height:1.8;opacity:.85}
+  .card button{display:block;width:100%;margin:8px 0 0;padding:12px;border-radius:10px;border:1px solid #4a54a0;background:#262d55;color:#fff;font:inherit;font-size:15px}
+  .card button.primary{background:linear-gradient(135deg,#6b7bff,#9a6bff);border:0}
+  .card button:disabled{opacity:.45}
+  .card input{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid #4a54a0;background:#0b0e1a;color:#fff;font:inherit;font-size:16px;text-align:center}
+  .status{min-height:22px;font-size:13px;margin:8px 0 0}
+  .ok{color:#7be3a0}.bad{color:#ff8a9b}
+  #me{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:4;display:none;align-items:center;gap:8px;direction:rtl;
+      background:#141a33cc;border:1px solid #39407a;border-radius:24px;padding:4px 10px 4px 4px;font-family:Tahoma,"Segoe UI",sans-serif;font-size:13px}
+  #me canvas{width:34px;height:34px}
+  #me small{display:block;opacity:.7;font-size:11px}
+  #toggle{top:auto;bottom:10px}
+  .board{max-height:46vh;overflow:auto;margin:6px 0;text-align:right}
+  .row{display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:10px}
+  .row.me{background:#2b3270;outline:1px solid #6b7bff}
+  .row .r{width:28px;text-align:center;font-weight:bold;color:#ffd890}
+  .row canvas{width:32px;height:32px;flex:none}
+  .row .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
+  .row .s{font-weight:bold;color:#cfd6ff}
+  .sep{text-align:center;opacity:.5;margin:2px 0}
+  .recent{font-size:12px;opacity:.85;margin-top:6px;line-height:1.9}
+  #hud{position:fixed;top:calc(12px + env(safe-area-inset-top));left:0;right:0;text-align:center;pointer-events:none}
+  #score{font-size:48px;font-weight:700;color:#fff}
+  #best{font-size:14px;opacity:.6}
+  #msg{position:fixed;bottom:18%;left:0;right:0;text-align:center;font-size:18px;pointer-events:none;opacity:.85}
+  #toggle{position:fixed;top:10px;right:10px;z-index:3;background:#1c2240;color:#cfd6ff;border:1px solid #39407a;border-radius:6px;padding:6px 10px;font-size:13px}
+  #panel{position:fixed;top:44px;right:10px;z-index:3;background:#141a33ee;border:1px solid #39407a;border-radius:8px;padding:10px;font-size:12px;width:230px;display:none;max-height:85vh;overflow:auto}
+  #panel label{display:flex;justify-content:space-between;align-items:center;margin:4px 0;gap:6px}
+  #panel input[type=range]{width:110px}
+  #panel button{margin:4px 4px 0 0;background:#262d55;color:#cfd6ff;border:1px solid #39407a;border-radius:4px;padding:4px 8px}
+  #stats{margin-top:8px;line-height:1.5;white-space:pre}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div id="score">0</div><div id="best"></div></div>
+<div id="msg"></div>
+<button id="menuBtn" aria-label="منو">☰</button>
+<div class="sheet" id="menu"><div class="card">
+  <h3>مدار ماه</h3>
+  <button class="primary" id="boardBtn">🏆 برترین‌ها</button>
+  <button data-myket="comment">⭐ امتیاز و نظر در مایکت</button>
+  <button data-myket="developer">🎮 بازی‌های دیگر سازنده</button>
+  <button data-myket="update">🔄 بررسی به‌روزرسانی</button>
+  <button data-myket="details">ℹ️ صفحهٔ بازی در مایکت</button>
+  <button data-close>ادامهٔ بازی</button>
+</div></div>
+<div class="sheet" id="rate"><div class="card">
+  <h3>از مدار ماه خوشت اومده؟</h3>
+  <p>اگه دوست داری، با امتیاز و نظرت در مایکت از ما حمایت کن.</p>
+  <button class="primary" data-myket="comment">بله، امتیاز می‌دم</button>
+  <button data-close>بعداً</button>
+</div></div>
+<div id="me"><canvas width="68" height="68"></canvas><div><b id="meName"></b><small id="meRank"></small></div></div>
+<div class="sheet" id="nameSheet"><div class="card">
+  <h3>نام کاربری‌ات را انتخاب کن</h3>
+  <p>با این نام در جدول برترین‌ها دیده می‌شوی. یک سیارهٔ اختصاصی هم برایت ساخته می‌شود.</p>
+  <canvas id="namePreview" width="128" height="128" style="width:64px;height:64px;margin:0 auto 10px;display:block"></canvas>
+  <input id="nameInput" maxlength="16" placeholder="مثلاً ستاره_۱۴" autocomplete="off">
+  <div class="status" id="nameStatus">۳ تا ۱۶ حرف فارسی یا انگلیسی، عدد یا _</div>
+  <button class="primary" id="nameOk" disabled>ثبت و شروع</button>
+  <button data-close>فعلاً آفلاین بازی می‌کنم</button>
+</div></div>
+<div class="sheet" id="boardSheet"><div class="card">
+  <h3>🏆 برترین‌ها</h3>
+  <div class="board" id="boardList"><p>در حال بارگذاری…</p></div>
+  <div class="recent" id="recent"></div>
+  <button data-close>بستن</button>
+</div></div>
+<button id="toggle">tune</button>
+<div id="panel">
+  <label>flight time <input type="range" id="T" min="0.1" max="0.8" step="0.05"><span></span></label>
+  <label>ring speed ω0 <input type="range" id="w0" min="0.2" max="2" step="0.05"><span></span></label>
+  <label>planet spin <input type="range" id="wp" min="0.4" max="3" step="0.1"><span></span></label>
+  <label>moon radius <input type="range" id="mr" min="6" max="15" step="1"><span></span></label>
+  <label>landing min-gap × <input type="range" id="gap" min="1" max="2" step="0.05"><span></span></label>
+  <label>start rings <input type="range" id="r0" min="1" max="7" step="1"><span></span></label>
+  <label>aim line <input type="checkbox" id="aim"></label>
+  <label>danger = predicted <input type="checkbox" id="predict"></label>
+  <label>bot (fixed rhythm) <input type="checkbox" id="bot"></label>
+  <label>bot interval ms <input type="range" id="botMs" min="200" max="2000" step="50"><span></span></label>
+  <label>seed <input type="text" id="seed" style="width:90px"></label>
+  <button id="daily">daily seed</button><button id="export">copy log</button><button id="clear">clear log</button>
+  <div id="stats"></div>
+</div>
+<script>
+"use strict";
+// ---------- config (tunable) ----------
+const DEF = {T:0.3, w0:0.6, wp:1.2, mr:10, gap:1.15, r0:3, aim:true, predict:false, bot:false, botMs:700, seed:"orbit"};
+const store = {
+  get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+const cfg = Object.assign({}, DEF, store.get("od.cfg",{}));
+const qs = new URLSearchParams(location.search);
+if (qs.get("seed")) cfg.seed = qs.get("seed");
+
+// ---------- world constants ----------
+const P = 30, D = 36, MAX_RINGS = 7, DT = 1/120, NEAR = 8;
+
+// ---------- seeded rng ----------
+function hash(s){let h=1779033703^s.length;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=h<<13|h>>>19}return h>>>0}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+// ---------- state ----------
+let S;
+function newRun(){
+  const rng = mulberry32(hash(cfg.seed));
+  const rings = [];
+  for(let k=1;k<=MAX_RINGS;k++){
+    let sign = k%2 ? 1 : -1;
+    if (rng() < Math.min(0.5, 0.05*k)) sign = -sign;
+    rings.push({R:P+k*D, w:sign*Math.min(3, cfg.w0*(1+0.08*k))});
+  }
+  S = {t:0, phi:0, rings, moons:[], fly:null, score:0, combo:0, near:0,
+       dead:null, deadAt:0, slow:1, taps:[], lastTap:-1};
+  setMsg(S.score===0 && best()===0 ? "ضربه بزن" : "");
+}
+const ringsActive = () => Math.min(MAX_RINGS, cfg.r0 + Math.floor(S.score/5));
+const targetRing = () => (S.score % ringsActive()) + 1;              // 1-based, cycles outward
+const planetW = () => cfg.wp*(1+0.02*S.score);
+const moonPos = (m,t) => { const r=S.rings[m.ring-1]; const a=m.th0+r.w*t; return [r.R*Math.cos(a), r.R*Math.sin(a)]; };
+
+// simulate a launch at time t0 with angle a to ring k; returns {hit, cause, ring, at, minD}
+function simFlight(t0, a, k){
+  const R = S.rings[k-1].R, lim = 2*cfg.mr - 0.5;
+  let minD = Infinity;
+  const steps = Math.max(1, Math.round(cfg.T/DT));
+  for(let i=1;i<=steps;i++){
+    const tt = t0 + i*DT, r = P + (R-P)*(i/steps);
+    const x = r*Math.cos(a), y = r*Math.sin(a);
+    for(const m of S.moons){
+      const [mx,my] = moonPos(m,tt); const d = Math.hypot(x-mx,y-my);
+      if (d < lim) return {hit:true, cause: m.ring===k ? "target":"inner", ring:m.ring, at:tt, minD:d, moon:m};
+      if (d < minD) minD = d;
+    }
+  }
+  // landing gap rule on target ring
+  const tl = t0 + steps*DT, x = R*Math.cos(a), y = R*Math.sin(a);
+  for(const m of S.moons) if (m.ring===k){
+    const [mx,my] = moonPos(m,tl);
+    if (Math.hypot(x-mx,y-my) < 2*cfg.mr*cfg.gap) return {hit:true, cause:"target", ring:k, at:tl, minD:0, moon:m};
+  }
+  return {hit:false, at:tl, minD};
+}
+
+function tap(){
+  if (typeof sheetOpen !== "undefined" && sheetOpen) return;
+  audioInit();
+  if (S.dead){ if (S.t - S.deadAt > 0.5/0.25*0.25 + 0.35) newRun(); return; }
+  if (S.fly) return;
+  const a = S.phi, k = targetRing();
+  const res = simFlight(S.t, a, k);          // outcome decided at tap instant
+  S.fly = {a, k, t0:S.t, res};
+  S.taps.push(Math.round(S.t/DT));
+  if (res.hit) S.slow = 0.25;                 // watch the mistake in slow-mo
+  tone(220, 0.05, "triangle"); buzz(8);
+  setMsg("");
+}
+
+function step(dt){
+  S.t += dt; S.phi += planetW()*dt;
+  const f = S.fly; if (!f) return;
+  if (f.res.hit && S.t >= f.res.at){ die(f.res); return; }
+  if (S.t >= f.res.at){
+    const r = S.rings[f.k-1];
+    S.moons.push({ring:f.k, th0: f.a - r.w*f.res.at});
+    burst(r.R*Math.cos(f.a), r.R*Math.sin(f.a), 14, ["#cfd8ff","#ffffff"], 50);
+    S.score++;
+    const near = f.res.minD < 2*cfg.mr + NEAR;
+    if (near){ S.combo++; S.score += S.combo; S.near++; flash(f.a, r.R, "#ffe066"); buzz(20); tone(880,0.08,"sine"); }
+    else S.combo = 0;
+    tone(330*Math.pow(2, (S.moons.length%8)/8), 0.09, "sine");
+    S.fly = null;
+  }
+}
+
+function die(res){
+  const [hx,hy] = moonPos(res.moon, res.at);
+  burst(hx,hy,60,["#ffb070","#ff5a3c","#ffe3a0","#ffffff"],140); shake=0.35;
+  S.dead = res; S.deadAt = S.t; S.fly = null; S.slow = 1;
+  buzz(80); tone(90, 0.3, "sawtooth");
+  const b = best(); if (S.score > b) store.set("od.best."+(cfg.bot?"bot":"h"), S.score);
+  const log = store.get("od.log", []);
+  log.push({ts:Date.now(), seed:cfg.seed, score:S.score, cause:res.cause, ring:res.ring,
+            moons:S.moons.length, near:S.near, dur:+S.t.toFixed(2), bot:cfg.bot,
+            cfg:{T:cfg.T,w0:cfg.w0,wp:cfg.wp,mr:cfg.mr,gap:cfg.gap,aim:cfg.aim,predict:cfg.predict}});
+  store.set("od.log", log.slice(-2000));
+  if (!cfg.bot && !SHOT) { maybeAskRating(); queueScore(S.score, S.moons.length, S.t*1000); }
+  const nb = best();
+  setMsg(res.cause==="inner" ? "در مسیر به ماه خورد" : "خیلی نزدیک فرود آمد" );
+  renderStats();
+}
+const best = () => store.get("od.best."+(cfg.bot?"bot":"h"), 0);
+
+// ---------- effects ----------
+let flashes = [];
+function flash(a,R,col){ flashes.push({x:R*Math.cos(a), y:R*Math.sin(a), col, t:0}); }
+let AC=null;
+function audioInit(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){} } }
+function tone(f,d,type){ if(!AC) return; const o=AC.createOscillator(), g=AC.createGain(); o.type=type; o.frequency.value=f;
+  g.gain.setValueAtTime(0.12,AC.currentTime); g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+d);
+  o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+d); }
+function buzz(ms){ try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){} }
+
+// ---------- render ----------
+const cv = document.getElementById("c"), cx = cv.getContext("2d");
+let W,H,scale,DPR=1,BG=null,TEX={},TW=[];
+function resize(){ DPR=Math.min(2,devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*DPR; cv.height=H*DPR;
+  cx.setTransform(DPR,0,0,DPR,0,0); scale = Math.min(W,H)/2/(P+MAX_RINGS*D+cfg.mr+14); buildArt(); }
+addEventListener("resize", resize);
+
+// ---------- procedural art ----------
+function vnoise(seed){
+  const p=new Float32Array(65536), r=mulberry32(seed); for(let i=0;i<65536;i++) p[i]=r();
+  const g=(a,b)=>p[((a&255)<<8)|(b&255)], s=t=>t*t*(3-2*t);
+  return (x,y)=>{ const xi=Math.floor(x), yi=Math.floor(y), u=s(x-xi), v=s(y-yi);
+    const a=g(xi,yi), b=g(xi+1,yi), c=g(xi,yi+1), d=g(xi+1,yi+1);
+    return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v; };
+}
+const fbm=(n,x,y,o=5)=>{ let s=0,a=0.5,f=1; for(let i=0;i<o;i++){ s+=a*n(x*f+i*17,y*f+i*31); f*=2; a*=0.5; } return s; };
+const mix=(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+function ramp(stops,t){ t=Math.max(0,Math.min(0.9999,t))*(stops.length-1); const i=Math.floor(t); return mix(stops[i],stops[i+1],t-i); }
+
+// unlit sphere with limb darkening (rotation-safe); lighting is a separate overlay
+function makeSphere(rpx, fn, seed){
+  rpx=Math.max(4,rpx); const size=rpx*2, c=document.createElement("canvas"); c.width=c.height=size;
+  const g=c.getContext("2d"), img=g.createImageData(size,size), n=vnoise(seed), extra=fn.init?fn.init(mulberry32(seed+1)):null;
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const nx=(x+0.5-rpx)/rpx, ny=(y+0.5-rpx)/rpx, d2=nx*nx+ny*ny; if(d2>1) continue;
+    const z=Math.sqrt(1-d2), lat=Math.asin(ny), lon=Math.asin(Math.max(-1,Math.min(1,nx/Math.cos(lat||1e-6))));
+    const col=fn(n,lon,lat,nx,ny,z,extra), limb=0.6+0.4*Math.pow(z,0.6), i=(y*size+x)*4;
+    img.data[i]=col[0]*limb; img.data[i+1]=col[1]*limb; img.data[i+2]=col[2]*limb;
+    img.data[i+3]=255*Math.max(0,Math.min(1,(1-Math.sqrt(d2))*rpx));
+  }
+  g.putImageData(img,0,0); return c;
+}
+const GAS=[[92,48,30],[176,104,58],[232,190,140],[204,140,84],[150,84,48],[238,214,176]];
+function gasGiant(n,lon,lat){
+  const t=0.5+0.5*Math.sin(lat*7+1.6*fbm(n,lon*1.5+3,lat*5));
+  let c=ramp(GAS,t*0.6+0.4*fbm(n,lon*3,lat*12,4));
+  const sx=(lon-0.45)/0.32, sy=(lat-0.42)/0.13, sd=sx*sx+sy*sy;          // great storm
+  if(sd<1){ const k=1-sd; c=mix(c,[196,70,40],k*0.85); c=mix(c,[240,170,120],Math.max(0,k-0.7)*2); }
+  return c;
+}
+function moonFn(tint){
+  const f=(n,lon,lat,nx,ny,z,cr)=>{
+    let v=0.55+0.45*fbm(n,nx*3+5,ny*3+5);
+    for(const k of cr){ const d=Math.hypot(nx-k.x,ny-k.y)/k.r; if(d<1){ v*= d<0.8 ? 0.72+0.2*d : 1.15; } }
+    return [tint[0]*v, tint[1]*v, tint[2]*v];
+  };
+  f.init=r=>{ const a=[]; for(let i=0;i<9;i++) a.push({x:r()*1.6-0.8,y:r()*1.6-0.8,r:0.08+r()*0.25}); return a; };
+  return f;
+}
+const MOON_TINTS=[[190,190,198],[170,215,245],[222,128,92],[200,180,240],[230,210,150],[150,230,190],[245,160,200]];
+
+function makeBg(){
+  const c=document.createElement("canvas"); c.width=W*DPR; c.height=H*DPR; const g=c.getContext("2d"); g.scale(DPR,DPR);
+  const r=mulberry32(99), bg=g.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*0.75);
+  bg.addColorStop(0,"#121633"); bg.addColorStop(1,"#03040b"); g.fillStyle=bg; g.fillRect(0,0,W,H);
+  const neb=[[110,60,200],[40,120,220],[200,60,140],[30,160,170]];
+  for(let i=0;i<7;i++){ const x=r()*W, y=r()*H, rad=(0.25+r()*0.4)*Math.max(W,H), col=neb[i%4];
+    const ng=g.createRadialGradient(x,y,0,x,y,rad); ng.addColorStop(0,`rgba(${col},0.13)`); ng.addColorStop(1,"rgba(0,0,0,0)");
+    g.fillStyle=ng; g.fillRect(0,0,W,H); }
+  for(let i=0;i<Math.floor(W*H/1400);i++){ const s=r()<0.92?r()*1.1+0.2:r()*1.8+1, a=0.3+r()*0.7;
+    g.fillStyle=`rgba(${220+r()*35},${220+r()*35},255,${a})`; g.beginPath(); g.arc(r()*W,r()*H,s/2,0,Math.PI*2); g.fill(); }
+  TW=[]; for(let i=0;i<50;i++) TW.push({x:r()*W,y:r()*H,s:1+r()*1.6,p:r()*6.28,f:0.5+r()*2});
+  return c;
+}
+function buildArt(){
+  BG=makeBg();
+  TEX.planet=makeSphere(Math.ceil((P-4)*scale*DPR), gasGiant, 7);
+  TEX.moons=MOON_TINTS.map((t,i)=>makeSphere(Math.ceil(cfg.mr*scale*DPR), moonFn(t), 100+i));
+}
+function shade(x,y,r,dark){
+  const g=cx.createRadialGradient(x-r*0.5,y-r*0.5,r*0.05,x,y,r*1.02);
+  g.addColorStop(0,"rgba(255,250,235,0.22)"); g.addColorStop(0.45,"rgba(0,0,0,0)"); g.addColorStop(1,`rgba(2,3,12,${dark})`);
+  cx.fillStyle=g; cx.beginPath(); cx.arc(x,y,r,0,Math.PI*2); cx.fill();
+}
+let parts=[], shake=0;
+function burst(x,y,n,cols,spd){ for(let i=0;i<n;i++){ const a=Math.random()*6.28, v=spd*(0.3+Math.random());
+  parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,l:0.5+Math.random()*0.6,t:0,c:cols[i%cols.length],s:1+Math.random()*2.5}); } }
+
+function dangerSet(){
+  const set = new Set(); if (S.dead || S.fly) return set;
+  const a = S.phi, k = targetRing();
+  if (cfg.predict){ const r = simFlight(S.t, a, k); if (r.hit) set.add(r.moon); return set; }
+  // current: moons sitting on the aim corridor right now, up to target ring
+  for(const m of S.moons){ if (m.ring > k) continue;
+    const [mx,my] = moonPos(m,S.t); const ang = Math.atan2(my,mx);
+    let da = Math.abs(((ang - a) % (2*Math.PI) + 3*Math.PI) % (2*Math.PI) - Math.PI);
+    const R = S.rings[m.ring-1].R;
+    if (R*Math.sin(Math.min(da,Math.PI/2)) < 2*cfg.mr && da < Math.PI/2) set.add(m); }
+  return set;
+}
+
+function drawMoon(tex, x, y, rot, r){
+  cx.save(); cx.translate(x,y); cx.rotate(rot); cx.drawImage(tex,-r,-r,2*r,2*r); cx.restore(); shade(x,y,r,0.88);
+}
+function draw(now){
+  cx.drawImage(BG,0,0,W,H);
+  for(const s of TW){ const a=0.35+0.65*Math.abs(Math.sin(now/1000*s.f+s.p)); cx.fillStyle=`rgba(255,255,255,${a})`;
+    cx.beginPath(); cx.arc(s.x,s.y,s.s,0,Math.PI*2); cx.fill(); }
+  if (S.dead){ cx.fillStyle="rgba(40,0,10,0.25)"; cx.fillRect(0,0,W,H); }
+  cx.save();
+  const sh = shake>0 ? shake*12 : 0;
+  cx.translate(W/2+(Math.random()-0.5)*sh, H/2+10+(Math.random()-0.5)*sh); cx.scale(scale, scale);
+  const act = ringsActive(), k = S.dead ? 0 : targetRing();
+  // orbits
+  for(let i=1;i<=MAX_RINGS;i++){
+    const r = S.rings[i-1].R; cx.beginPath(); cx.arc(0,0,r,0,Math.PI*2);
+    if (i===k){ cx.shadowColor="#8fa0ff"; cx.shadowBlur=14*scale; cx.strokeStyle=`rgba(150,165,255,${0.55+0.25*Math.sin(now/250)})`; cx.lineWidth=2; }
+    else { cx.shadowBlur=0; cx.strokeStyle = i<=act ? "rgba(120,140,255,0.22)" : "rgba(120,140,255,0.07)"; cx.lineWidth=1; }
+    cx.stroke();
+  }
+  cx.shadowBlur=0;
+  // aim line
+  if (cfg.aim && !S.dead && !S.fly && k){
+    const R = S.rings[k-1].R, a=S.phi, gl=cx.createLinearGradient(P*Math.cos(a),P*Math.sin(a),R*Math.cos(a),R*Math.sin(a));
+    gl.addColorStop(0,"rgba(255,220,160,0.7)"); gl.addColorStop(1,"rgba(255,220,160,0)");
+    cx.setLineDash([5,7]); cx.lineDashOffset=-now/40; cx.strokeStyle=gl; cx.lineWidth=1.6;
+    cx.beginPath(); cx.moveTo(P*Math.cos(a),P*Math.sin(a)); cx.lineTo(R*Math.cos(a),R*Math.sin(a)); cx.stroke(); cx.setLineDash([]);
+  }
+  // planet atmosphere + body
+  const pr=P-4, at=cx.createRadialGradient(0,0,pr*0.9,0,0,pr*1.6);
+  at.addColorStop(0,"rgba(255,170,100,0.45)"); at.addColorStop(1,"rgba(255,120,60,0)");
+  cx.fillStyle=at; cx.beginPath(); cx.arc(0,0,pr*1.6,0,Math.PI*2); cx.fill();
+  cx.save(); cx.rotate(S.phi); cx.drawImage(TEX.planet,-pr,-pr,2*pr,2*pr); cx.restore();
+  shade(0,0,pr,0.92);
+  // launcher beacon
+  const bx=(pr+2)*Math.cos(S.phi), by=(pr+2)*Math.sin(S.phi);
+  cx.shadowColor="#ffd890"; cx.shadowBlur=12*scale; cx.fillStyle="#fff2cc"; cx.beginPath(); cx.arc(bx,by,3.2,0,Math.PI*2); cx.fill(); cx.shadowBlur=0;
+  // moons
+  const danger = dangerSet();
+  for(const m of S.moons){
+    const [x,y] = moonPos(m, S.t), hit = S.dead && S.dead.moon===m, rg=S.rings[m.ring-1];
+    // short orbit trail
+    const ang=Math.atan2(y,x), dir=Math.sign(rg.w);
+    cx.beginPath(); cx.arc(0,0,rg.R, dir>0?ang-0.35:ang, dir>0?ang:ang+0.35);
+    cx.strokeStyle="rgba(180,200,255,0.12)"; cx.lineWidth=cfg.mr*0.9; cx.stroke();
+    drawMoon(TEX.moons[(m.ring-1)%TEX.moons.length], x, y, ang, cfg.mr);
+    if (danger.has(m) || hit){ cx.strokeStyle="#ff4d6d"; cx.lineWidth=2.2; cx.shadowColor="#ff4d6d"; cx.shadowBlur=10*scale;
+      cx.beginPath(); cx.arc(x,y,cfg.mr+2.5,0,Math.PI*2); cx.stroke(); cx.shadowBlur=0;
+      const s=cfg.mr*0.5; cx.beginPath(); cx.moveTo(x-s,y-s); cx.lineTo(x+s,y+s); cx.moveTo(x+s,y-s); cx.lineTo(x-s,y+s); cx.strokeStyle="#fff"; cx.lineWidth=2; cx.stroke(); }
+  }
+  // flying moon with comet trail
+  const f = S.fly;
+  if (f){ const R=S.rings[f.k-1].R, p=Math.min(1,(S.t-f.t0)/cfg.T), r=P+(R-P)*p, a=f.a, x=r*Math.cos(a), y=r*Math.sin(a);
+    const tr=cx.createLinearGradient(pr*Math.cos(a),pr*Math.sin(a),x,y); tr.addColorStop(0,"rgba(255,220,160,0)"); tr.addColorStop(1,"rgba(255,230,190,0.8)");
+    cx.strokeStyle=tr; cx.lineWidth=cfg.mr*1.2; cx.lineCap="round"; cx.beginPath(); cx.moveTo(pr*Math.cos(a),pr*Math.sin(a)); cx.lineTo(x,y); cx.stroke(); cx.lineCap="butt";
+    drawMoon(TEX.moons[(f.k-1)%TEX.moons.length], x, y, a, cfg.mr); }
+  // flashes + particles
+  flashes = flashes.filter(q=>q.t<0.5);
+  for(const q of flashes){ cx.beginPath(); cx.arc(q.x,q.y,cfg.mr+q.t*50,0,Math.PI*2); cx.strokeStyle=q.col; cx.globalAlpha=1-q.t*2; cx.lineWidth=2; cx.stroke(); cx.globalAlpha=1; }
+  parts = parts.filter(q=>q.t<q.l);
+  cx.globalCompositeOperation="lighter";
+  for(const q of parts){ cx.globalAlpha=1-q.t/q.l; cx.fillStyle=q.c; cx.beginPath(); cx.arc(q.x,q.y,q.s,0,Math.PI*2); cx.fill(); }
+  cx.globalAlpha=1; cx.globalCompositeOperation="source-over";
+  cx.restore();
+  const b = best(), fa = n => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+  document.getElementById("score").textContent = fa(S.score);
+  document.getElementById("best").textContent = b ? (!S.dead && b-S.score>0 && b-S.score<=2 ? `${fa(b-S.score)} تا رکورد` : `رکورد ${fa(b)}`) : "";
+}
+function setMsg(t){ document.getElementById("msg").textContent = t; }
+
+// ---------- loop ----------
+let last = performance.now(), acc = 0, botT = 0;
+function frame(now){
+  let dt = Math.min(0.1, (now-last)/1000); last = now;
+  for(const q of flashes) q.t += dt;
+  for(const q of parts){ q.t += dt; q.x += q.vx*dt; q.y += q.vy*dt; q.vx *= 0.96; q.vy *= 0.96; }
+  shake = Math.max(0, shake - dt);
+  if (!S.dead){
+    acc += dt*S.slow;
+    while(acc >= DT){ step(DT); acc -= DT; if (S.dead) break; }
+    if (cfg.bot){ botT += dt*1000; if (botT >= cfg.botMs){ botT = 0; tap(); } }
+  } else {
+    S.t += dt; // replay pause clock
+    if (cfg.bot && S.t - S.deadAt > 0.6) { newRun(); botT = 0; }
+    else if (S.t - S.deadAt > 0.9 && !document.getElementById("msg").textContent.includes("دوباره"))
+      setMsg(document.getElementById("msg").textContent + " — ضربه بزن، دوباره");
+  }
+  draw(now); requestAnimationFrame(frame);
+}
+
+// ---------- input ----------
+cv.addEventListener("pointerdown", e=>{ e.preventDefault(); tap(); });
+addEventListener("keydown", e=>{ if (e.code==="Space"){ e.preventDefault(); tap(); } });
+
+// ---------- tuning panel ----------
+const panel = document.getElementById("panel");
+document.getElementById("toggle").onclick = ()=>{ panel.style.display = panel.style.display==="block"?"none":"block"; renderStats(); };
+for(const id of ["T","w0","wp","mr","gap","r0","botMs"]){
+  const el = document.getElementById(id), out = el.nextElementSibling;
+  el.value = cfg[id]; out.textContent = cfg[id];
+  el.oninput = ()=>{ cfg[id] = +el.value; out.textContent = el.value; store.set("od.cfg", cfg); if(id==="mr") resize(); newRun(); };
+}
+for(const id of ["aim","predict","bot"]){
+  const el = document.getElementById(id); el.checked = cfg[id];
+  el.onchange = ()=>{ cfg[id] = el.checked; store.set("od.cfg", cfg); newRun(); renderStats(); };
+}
+const seedEl = document.getElementById("seed"); seedEl.value = cfg.seed;
+seedEl.onchange = ()=>{ cfg.seed = seedEl.value || "orbit"; store.set("od.cfg", cfg); newRun(); };
+document.getElementById("daily").onclick = ()=>{ cfg.seed = "orbit-"+new Date().toISOString().slice(0,10); seedEl.value=cfg.seed; store.set("od.cfg",cfg); newRun(); };
+document.getElementById("export").onclick = ()=>{ const t=JSON.stringify(store.get("od.log",[])); navigator.clipboard?.writeText(t).then(()=>alert("log copied"),()=>prompt("copy:",t)); };
+document.getElementById("clear").onclick = ()=>{ if(confirm("clear death log and bests?")){ store.set("od.log",[]); store.set("od.best.h",0); store.set("od.best.bot",0); renderStats(); } };
+
+function renderStats(){
+  const log = store.get("od.log", []), h = log.filter(x=>!x.bot), b = log.filter(x=>x.bot);
+  const med = a => { if(!a.length) return "-"; const s=a.map(x=>x.score).sort((p,q)=>p-q); return s[s.length>>1]; };
+  const inner = h.length ? Math.round(100*h.filter(x=>x.cause==="inner").length/h.length) : "-";
+  const botMax = b.length ? Math.max(...b.map(x=>x.moons)) : "-";
+  document.getElementById("stats").textContent =
+`human deaths: ${h.length}
+  inner-ring deaths: ${inner}%   (KILL if <40%)
+  median score: ${med(h)}
+bot runs: ${b.length}
+  bot best moons: ${botMax}   (KILL if >=15)`;
+}
+
+// ---------- Myket intents (native plugin in the Android build, website otherwise) ----------
+const PKG = "ir.orbitdrop.game";
+function myket(action){
+  const p = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Myket;
+  if (p) p.open({action}); else window.open("https://myket.ir/app/"+PKG, "_blank");
+}
+let sheetOpen = false;
+function openSheet(id){ document.getElementById(id).classList.add("open"); sheetOpen = true; }
+function closeSheets(){ document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("open")); sheetOpen = false; }
+document.getElementById("menuBtn").onclick = ()=>openSheet("menu");
+document.querySelectorAll("[data-myket]").forEach(b=> b.onclick = ()=>{
+  if (b.dataset.myket==="comment") store.set("od.rated", true);
+  myket(b.dataset.myket); closeSheets(); });
+document.querySelectorAll("[data-close]").forEach(b=> b.onclick = closeSheets);
+// ask once (after 5 games, again after 25 if they said "later") before opening the rating intent
+function maybeAskRating(){
+  const n = store.get("od.games",0)+1; store.set("od.games", n);
+  if (!store.get("od.rated",false) && (n===5 || n===25)) setTimeout(()=>openSheet("rate"), 900);
+}
+
+// ---------- online: username, per-device login, scores, leaderboard ----------
+// Set this to your server address after uploading orbit-api to cPanel (must be https).
+const API = (qs.has("dev") && qs.get("api")) || "https://orbit.mahsen81.ir/index.php";
+const ONLINE = !API.includes("YOUR-DOMAIN");
+const faNum = n => String(n).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+let me = store.get("od.me", null), token = store.get("od.token", null);
+
+async function api(action, data, query){
+  const ctl = new AbortController(), to = setTimeout(()=>ctl.abort(), 7000);
+  try {
+    const url = API + "?a=" + action + (query ? "&" + new URLSearchParams(query) : "");
+    const r = await fetch(url, data ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data), signal:ctl.signal} : {signal:ctl.signal});
+    const j = await r.json(); j.status = r.status; return j;
+  } finally { clearTimeout(to); }
+}
+async function deviceId(){
+  const p = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Myket;
+  if (p) { try { const r = await p.deviceId(); if (r.id && r.id.length >= 8) return r.id; } catch(e){} }
+  let id = store.get("od.dev", null);
+  if (!id){ id = "w-" + Array.from(crypto.getRandomValues(new Uint8Array(12)), b=>b.toString(16).padStart(2,"0")).join(""); store.set("od.dev", id); }
+  return id;
+}
+
+// procedural planet avatar from the server-given seed
+const AV_PAL = [GAS,
+  [[20,40,90],[60,120,200],[170,215,245],[100,160,230],[40,80,150],[220,240,255]],
+  [[30,70,40],[70,140,80],[180,220,140],[110,170,90],[50,100,60],[220,240,190]],
+  [[60,30,90],[130,70,180],[220,170,240],[160,110,210],[90,50,140],[240,215,255]],
+  [[90,20,30],[180,60,60],[250,170,130],[210,100,80],[130,40,40],[255,220,190]]];
+const avCache = {};
+function avatar(seed, px){
+  const k = seed+"_"+px; if (avCache[k]) return avCache[k];
+  const pal = AV_PAL[seed % AV_PAL.length], r = px/2;
+  const fn = (n,lon,lat)=>{ const t=0.5+0.5*Math.sin(lat*(5+seed%4)+1.6*fbm(n,lon*1.5+3,lat*5)); return ramp(pal, t*0.6+0.4*fbm(n,lon*3,lat*12,4)); };
+  const sph = makeSphere(Math.ceil(r), fn, seed % 100000);
+  const c = document.createElement("canvas"); c.width = c.height = px; const g = c.getContext("2d");
+  g.drawImage(sph, 0, 0, px, px);
+  const sh = g.createRadialGradient(r*0.5,r*0.5,r*0.05,r,r,r*1.02);
+  sh.addColorStop(0,"rgba(255,250,235,0.25)"); sh.addColorStop(0.45,"rgba(0,0,0,0)"); sh.addColorStop(1,"rgba(2,3,12,0.85)");
+  g.fillStyle = sh; g.beginPath(); g.arc(r,r,r,0,Math.PI*2); g.fill();
+  return avCache[k] = c;
+}
+function paintAvatar(canvas, seed){ const g=canvas.getContext("2d"); g.clearRect(0,0,canvas.width,canvas.height); g.drawImage(avatar(seed, canvas.width),0,0); }
+
+function showMe(){
+  const box = document.getElementById("me");
+  if (!me){ box.style.display="none"; return; }
+  box.style.display="flex";
+  paintAvatar(box.querySelector("canvas"), me.avatar);
+  document.getElementById("meName").textContent = me.username;
+  document.getElementById("meRank").textContent = `رتبه ${faNum(me.rank)} · بهترین ${faNum(me.best)}`;
+  if (me.best > best()) store.set("od.best.h", me.best);   // restore record on a new phone
+}
+function setMe(r){ if (r && r.player){ me = r.player; store.set("od.me", me); if (r.token){ token=r.token; store.set("od.token", token); } showMe(); } }
+
+// username picker with live availability check
+let nameTimer = 0, nameOkVal = "";
+const nameInput = document.getElementById("nameInput"), nameStatus = document.getElementById("nameStatus"), nameOk = document.getElementById("nameOk");
+const NAME_RE = /^[؀-ۿa-zA-Z0-9_‌]{3,16}$/;
+function nameMsg(t, cls){ nameStatus.textContent = t; nameStatus.className = "status " + (cls||""); }
+nameInput.addEventListener("input", ()=>{
+  const u = nameInput.value.trim(); nameOk.disabled = true; nameOkVal = ""; clearTimeout(nameTimer);
+  let h = 0; for (const ch of u) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+  paintAvatar(document.getElementById("namePreview"), (h % 2147483646) + 1);
+  if (!NAME_RE.test(u) || /^[\d_۰-۹]+$/.test(u)) { nameMsg(u ? "فقط ۳ تا ۱۶ حرف، عدد یا _" : "۳ تا ۱۶ حرف فارسی یا انگلیسی، عدد یا _", u ? "bad" : ""); return; }
+  nameMsg("در حال بررسی…");
+  nameTimer = setTimeout(async ()=>{
+    try { const r = await api("check", null, {username:u});
+      if (nameInput.value.trim() !== u) return;
+      if (r.available){ nameMsg("✓ این نام آزاد است", "ok"); nameOk.disabled = false; nameOkVal = u; }
+      else nameMsg(r.valid ? "✗ این نام قبلاً گرفته شده" : "✗ نام معتبر نیست", "bad");
+    } catch(e){ nameMsg("اتصال به سرور برقرار نشد", "bad"); }
+  }, 400);
+});
+nameOk.onclick = async ()=>{
+  if (!nameOkVal) return; nameOk.disabled = true; nameMsg("در حال ثبت…");
+  try { const r = await api("register", {device_id: await deviceId(), username: nameOkVal});
+    if (r.ok){ setMe(r); closeSheets(); flushScores(); }
+    else { nameMsg(r.error==="taken" ? "✗ همین الان کس دیگری این نام را گرفت" : "✗ نام معتبر نیست", "bad"); }
+  } catch(e){ nameMsg("اتصال به سرور برقرار نشد", "bad"); nameOk.disabled = false; }
+};
+
+// scores are queued so games played offline are sent later
+function queueScore(score, moons, durMs){
+  if (!ONLINE) return;
+  const q = store.get("od.queue", []); q.push({score, moons, dur_ms: Math.round(durMs)}); store.set("od.queue", q.slice(-50));
+  flushScores();
+}
+let flushing = false;
+async function flushScores(){
+  if (!ONLINE || !token || flushing) return; flushing = true;
+  try {
+    let q = store.get("od.queue", []);
+    while (q.length){
+      const r = await api("score", Object.assign({token}, q[0]));
+      if (r.status === 429){ await new Promise(res=>setTimeout(res, 1200)); continue; }
+      if (r.status === 401){ token = null; store.set("od.token", null); break; }
+      q.shift(); store.set("od.queue", q);
+      if (r.ok) setMe(r);
+    }
+  } catch(e){ /* offline: try again later */ }
+  flushing = false;
+}
+
+async function openBoard(){
+  closeSheets(); openSheet("boardSheet");
+  const list = document.getElementById("boardList"), rec = document.getElementById("recent");
+  if (!ONLINE){ list.innerHTML = "<p>جدول برترین‌ها هنوز فعال نشده است.</p>"; rec.textContent=""; return; }
+  list.innerHTML = "<p>در حال بارگذاری…</p>"; rec.textContent = "";
+  try {
+    const r = await api("board", null, token ? {token, limit:50} : {limit:50});
+    list.innerHTML = "";
+    const row = (p, mine)=>{ const d=document.createElement("div"); d.className="row"+(mine?" me":"");
+      const c=document.createElement("canvas"); c.width=c.height=64; paintAvatar(c, p.avatar);
+      d.innerHTML = `<span class="r">${faNum(p.rank)}</span>`; d.appendChild(c);
+      const n=document.createElement("span"); n.className="n"; n.textContent=p.username; d.appendChild(n);
+      const s=document.createElement("span"); s.className="s"; s.textContent=faNum(p.best); d.appendChild(s);
+      list.appendChild(d); return d; };
+    let meShown = false, meRow = null;
+    for (const p of r.top){ const mine = !!(r.me && p.username===r.me.username); if (mine){ meShown=true; meRow=row(p,true); } else row(p,false); }
+    if (!r.top.length) list.innerHTML = "<p>هنوز کسی امتیاز ثبت نکرده. اولین نفر باش!</p>";
+    if (r.me){
+      setMe({player:r.me});
+      if (!meShown){ const s=document.createElement("div"); s.className="sep"; s.textContent="⋯"; list.appendChild(s); meRow=row(r.me,true); }
+      if (meRow) setTimeout(()=>meRow.scrollIntoView({block:"nearest"}), 50);
+      if (r.me.recent && r.me.recent.length)
+        rec.textContent = "امتیازهای اخیر تو: " + r.me.recent.map(x=>faNum(x.score)).join("، ");
+    } else if (!token) {
+      rec.textContent = "برای حضور در جدول، نام کاربری انتخاب کن.";
+    }
+  } catch(e){ list.innerHTML = "<p>اتصال به سرور برقرار نشد. اینترنت را بررسی کن.</p>"; }
+}
+document.getElementById("boardBtn").onclick = openBoard;
+document.getElementById("me").onclick = openBoard;
+
+async function onlineInit(){
+  showMe();
+  if (!ONLINE) return;
+  try {
+    const r = await api("login", {device_id: await deviceId()});
+    if (r.ok && r.player) { setMe(r); flushScores(); }
+    else if (r.ok) { me = null; token = null; store.set("od.me", null); store.set("od.token", null); showMe();
+      if (!store.get("od.nameLater", false) || store.get("od.games",0) % 10 === 9) openSheet("nameSheet"); }
+  } catch(e){ /* offline: keep cached profile */ }
+}
+document.querySelector("#nameSheet [data-close]").addEventListener("click", ()=>store.set("od.nameLater", true));
+
+// tuning panel only in dev builds (?dev=1)
+if (!qs.has("dev")) { document.getElementById("toggle").style.display="none"; cfg.bot=false; }
+document.addEventListener("visibilitychange", ()=>{ if (document.hidden && AC) AC.suspend(); else if (AC) AC.resume(); });
+// store screenshots: ?shot=1|2|3 renders one real game state with a caption, no loop
+const SHOT = +(qs.get("shot")||0);
+const CAPS = ["", "با یک ضربه، ماه را به مدار بفرست", "هر مدار با سرعت خودش می‌چرخد", "نگذار ماه‌ها به هم بخورند!"];
+function shotScene(n){
+  const goal = n===1 ? 2 : n===2 ? 12 : 9;
+  for(let s=1; s<400; s++){
+    cfg.seed = "shot"+s; newRun();
+    let i=0; while(!S.dead && S.moons.length<goal && i<200000){ if(!S.fly && i%84===0) tap(); step(DT); i++; }
+    if (n!==3 && !S.dead && S.moons.length>=goal){ for(let k=0;k<30;k++) step(DT); if(!S.dead) return; }
+    if (n===3){ if(S.dead) continue;
+      // keep tapping until the next collision so the loss is real
+      parts=[]; let j=0; while(!S.dead && j<200000){ if(!S.fly && j%37===0) tap(); step(DT); j++; }
+      if (S.dead && S.moons.length>=goal){ for(const q of parts){ q.t+=0.12; q.x+=q.vx*0.12; q.y+=q.vy*0.12; } shake=0; return; } }
+  }
+}
+function caption(t){
+  const h = H*0.22, g = cx.createLinearGradient(0,H-h,0,H); g.addColorStop(0,"rgba(5,6,16,0)"); g.addColorStop(1,"rgba(5,6,16,0.92)");
+  cx.fillStyle=g; cx.fillRect(0,H-h,W,h);
+  cx.direction="rtl"; cx.textAlign="center"; cx.fillStyle="#fff";
+  let fs = Math.round(W*0.062); do { cx.font=`bold ${fs}px Tahoma, "Segoe UI", sans-serif`; fs-=2; } while (cx.measureText(t).width > W*0.86 && fs > 10);
+  cx.shadowColor="rgba(120,140,255,0.8)"; cx.shadowBlur=W*0.02; cx.fillText(t, W/2, H-h*0.38); cx.shadowBlur=0;
+}
+if (SHOT){
+  document.getElementById("menuBtn").style.display="none";
+  resize(); shotScene(SHOT); setMsg(""); flashes=[];
+  if (SHOT!==3) parts=[];
+  const t0 = performance.now();
+  (function still(){ draw(t0); caption(CAPS[SHOT]); requestAnimationFrame(still); })();   // redraw after any resize
+  document.title="done";
+} else { resize(); newRun(); renderStats(); requestAnimationFrame(frame); onlineInit(); }
+</script>
+</body>
+</html>

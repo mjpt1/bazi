@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">مدار ماه</string>
+    <string name="title_activity_main">مدار ماه</string>
+    <string name="package_name">ir.orbitdrop.game</string>
+    <string name="custom_url_scheme">ir.orbitdrop.game</string>
+</resources>
